@@ -3,12 +3,12 @@
 CREATE SCHEMA IF NOT EXISTS ALT_SCHOOL;
 
 
--- create and populate tables
+-- Create and populate tables
 
 -- Create table ALT_SCHOOL.PRODUCTS
 create table if not exists ALT_SCHOOL.PRODUCTS
 (
-    id  serial primary key,
+    id  serial primary key, 
     name varchar not null,
     price numeric(10, 2) not null
 );
@@ -25,7 +25,7 @@ create table if not exists ALT_SCHOOL.CUSTOMERS
     customer_id uuid not null primary key,
     device_id uuid not null,
     location varchar not null,
-    currency varchar not null
+    currency varchar not null  -- The currency field was expected to be of bigint data type from design perspective. However, the customers.csv data showed that the currency field is of type string. Hence, the data type for the currency field was changed to "VARCHAR" in this DDL.
 );
 
 -- populating table ALT_SCHOOL.CUSTOMERS with customers data
