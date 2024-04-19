@@ -1,8 +1,8 @@
 
 -- ANSWERS TO QUESTION PART 2a
---- The most ordered item based on the number of times it appears in an order cart that checked out successfully:
 
--- Creating a CTE table to filter and temporally store successful checkouts so as to ensure that only successful orders are considered subsequently. 
+--- 1. The most ordered item based on the number of times it appears in an order cart that checked out successfully:
+--  Creating a CTE table to filter and temporarily store successful checkouts so as to ensure that only successful orders are considered subsequently. 
 WITH successful_orders AS (
   SELECT o.order_id, o.customer_id
   FROM ALT_SCHOOL.ORDERS o
@@ -23,9 +23,10 @@ ORDER BY num_times_in_successful_orders DESC
 LIMIT 1;
 
 
--- Top 5 spenders without considering currency, and without using the line_item table:
 
--- Created a CTE table to filter and temporally store successful order amounts so as to ensure that only the amounts spent on completed orders are calculated. 
+-- 2. Top 5 spenders without considering currency, and without using the line_item table:
+
+-- Created a CTE table to filter and temporarily store successful order amounts so as to ensure that only the amounts spent on completed orders are calculated. 
 WITH order_amounts AS (
   SELECT o.customer_id, o.status, SUM(p.price) AS order_amount
   FROM ALT_SCHOOL.ORDERS o
@@ -36,7 +37,6 @@ WITH order_amounts AS (
   WHERE o.status = 'success'
   GROUP BY o.customer_id, o.status
 )
-
 -- Now selecting the customer_ids, customer location and total amount spent based on the filtered successful orders.
 SELECT
   c.customer_id,
@@ -54,9 +54,8 @@ LIMIT 5;
 
 -- ANSWERS TO QUESTION PART 2b
 
--- The most common location (country) where successful checkouts occurred:
-
--- Creating a CTE table to filter and temporally store locations of the successful checkouts in order to ensure that only the locations of customers with successful checkouts are considered. 
+-- 1. The most common location (country) where successful checkouts occurred:
+-- Creating a CTE table to filter and temporarily store locations of the successful checkouts in order to ensure that only the locations of customers with successful checkouts are considered. 
 with successful_locations AS (
 SELECT
 	c.location AS location,
@@ -77,18 +76,16 @@ where sl.checkout_count = (SELECT MAX(checkout_count) FROM successful_locations)
 
 
 
--- Customers who abandoned their carts and number of events (excluding visits) that occurred before the abandonment:
-
--- Creating a CTE table to filter and temporally store customers who abandoned their carts in order to ensure that only the carts abandoned  of customers with successful checkouts are considered. 
+-- 2. Customers who abandoned their carts and number of events (excluding visits) that occurred before the abandonment:
+-- Creating a CTE table to filter and temporarily store customers who abandoned their carts in order to ensure that only the carts abandoned  of customers with successful checkouts are considered. 
 WITH abandoned_carts AS (
   SELECT
     customer_id,
     cast(event_data ->> 'timestamp' as timestamp) AS abandonment_timestamp
   FROM ALT_SCHOOL.EVENTS
-  WHERE event_data->>'event_type' = 'add_to_cart' --or event_data->>'event_type' = 'remove_from_cart'
-  
-  -- Ensuring that there are no subsequent checkout event for the customer
-  AND NOT EXISTS (
+
+  -- Ensuring that there are no checkout events subsequenty for the customer and validating that the events happened before the time of abandoning an event.
+  WHERE  NOT EXISTS (
     SELECT 1
     FROM ALT_SCHOOL.EVENTS e2
     WHERE e2.customer_id = ALT_SCHOOL.EVENTS.customer_id
@@ -109,24 +106,22 @@ ORDER BY num_events desc;
 
 
 
--- TODO: Average number of visits per customer, considering only customers who completed a checkout
+-- 3. Average number of visits per customer, considering only customers who completed a checkout
 
--- Creating a CTE to store successful orders in other to count the number of customers who completed a checkout. 
--- Creating a CTE to store successful orders in other to count the number of customers who completed a checkout. 
-
-WITH successful_orders AS (
-  SELECT customer_id
-  FROM ALT_SCHOOL.ORDERS o
-  WHERE o.status = 'success' -- Applying a filter to ensure that only successfully completed orders are counted.
+-- Creating a CTE table to temporarily store total number of visits made by each customer. This was necessary in order to take into account all visits made by all customers before going further to select only those with successful checkouts. 
+WITH all_visits AS (  
+SELECT e.customer_id,
+	count(*) as num_of_orders
+  FROM ALT_SCHOOL.EVENTS e
+	group by e.customer_id
 )
 
-SELECT s.customer_id,
-ROUND(cast(COUNT(*) as numeric) / NULLIF(COUNT(distinct s.customer_id),0),2) AS average_visits
-FROM ALT_SCHOOL.CUSTOMERS c
-INNER JOIN successful_orders s ON c.customer_id = s.customer_id
-INNER JOIN ALT_SCHOOL.EVENTS e ON s.customer_id = e.customer_id
-GROUP BY s.customer_id
-HAVING COUNT(*) > 0;
+SELECT a.customer_id,
+		round(avg(a.num_of_orders), 2) as average_visits  -- Calculating average number of visits made by customers and rounding the result to 2 decimal places using the ROUND() function.
+	from all_visits a
+	inner join ALT_SCHOOL.EVENTS e on e.customer_id = a.customer_id
+	where e.event_data ->>'status' = 'success' -- Limiting the average number of visits to only those who had successful checkouts from the events table. The events table was used here because it contains all user activities on the platform which shows user interaction on the applicstion.
+	GROUP BY a.customer_id;
 
 
 
